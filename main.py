@@ -1,14 +1,17 @@
 from enum import Enum
 
+
 class Position:
     def __init__(self, x: int = 0, y: int = 0) -> None:
         self.x = x
         self.y = y
 
+
 class SpaceType(Enum):
     EMPTY = "E"
     DROP_OFF = "D"
     PICK_UP = "P"
+
 
 class Space:
     def __init__(self, type: SpaceType = SpaceType.EMPTY, num_blocks: int = 0, max_blocks: int = 5) -> None:
@@ -35,11 +38,13 @@ class Space:
         if self.num_blocks > self.max_blocks:
             raise ValueError("max blocks exceeded on space")
 
+
 class Environment:
     def __init__(self, n: int = 5, m: int = 5) -> None:
         self.n = n
         self.m = m
-        self.pd_world = [[Space(max_blocks=0) for _ in range(m)] for _ in range(n)]
+        self.pd_world = [[Space(max_blocks=0)
+                          for _ in range(m)] for _ in range(n)]
 
     def set(self, pos: Position, space: Space) -> None:
         if pos.x < 0 or self.n <= pos.x or pos.y < 0 or self.m <= pos.y:
@@ -50,11 +55,11 @@ class Environment:
         if pos.x < 0 or self.n <= pos.x or pos.y < 0 or self.m <= pos.y:
             raise ValueError("cannot find space as position is out of bounds")
         return self.pd_world[pos.x][pos.y]
-    
+
     def within_bounds(self, pos: Position) -> None:
         return -1 < pos.x and pos.x < self.n and \
-                -1 < pos.y and pos.y < self.m
-    
+            -1 < pos.y and pos.y < self.m
+
     def __str__(self) -> str:
         res = ""
         for i in range(self.n):
@@ -63,24 +68,29 @@ class Environment:
             res += "\n"
         return res
 
+
 class Direction(Enum):
     NORTH = 0
     SOUTH = 1
     EAST = 2
     WEST = 3
 
+
 class ActorType(Enum):
     RED = "R"
     BLUE = "B"
     BLACK = "K"
 
+
 class Actor:
     def __init__(self, type: ActorType) -> None:
         self.type = type
 
+
 class State:
     def __init__(self, env: Environment, actors: list[Actor]) -> None:
         pass
+
 
 def main():
     env = Environment(n=5, m=5)

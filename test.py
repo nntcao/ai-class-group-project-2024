@@ -1,6 +1,7 @@
 import unittest
 from main import *
 
+
 class TestShape(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(Space(SpaceType.EMPTY).type, SpaceType.EMPTY)
@@ -33,11 +34,12 @@ class TestShape(unittest.TestCase):
     def test_pickup_invalid_remove(self):
         sp = Space(SpaceType.PICK_UP, 0, 5)
         self.assertRaises(ValueError, sp.remove_block)
-        
+
     def test_dropoff_invalid_add(self):
         sp = Space(SpaceType.PICK_UP, 5, 5)
         self.assertRaises(ValueError, sp.add_block)
-        
+
+
 class TestEnvironment(unittest.TestCase):
     def test_creation(self):
         env = Environment(n=1, m=1)
@@ -52,7 +54,6 @@ class TestEnvironment(unittest.TestCase):
         env = Environment(n=1, m=1)
         env.set(Position(0, 0), Space(SpaceType.DROP_OFF))
         self.assertEqual(env.at(Position(0, 0)).type, SpaceType.DROP_OFF)
-
 
 
 if __name__ == "__main__":
