@@ -31,6 +31,17 @@ class Space:
         self.type = type
         self.num_blocks = num_blocks
         self.max_blocks = max_blocks
+        self.reward = 0
+        self._init_reward()
+
+    def _init_reward(self):
+        if self.type == SpaceType.EMPTY:
+            self.reward = -1
+        elif self.type == SpaceType.DROP_OFF:
+            self.reward = 13
+        elif self.type == SpaceType.PICK_UP:
+            self.reward = 13
+
     
     def __str__(self) -> str:
         return "(" + str(self.type) + "," + str(self.num_blocks) + "," + str(self.max_blocks) + ")"
