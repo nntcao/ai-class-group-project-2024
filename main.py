@@ -77,6 +77,7 @@ class Actor:
     def __init__(self, type: ActorType, position: Position = Position(0, 0)) -> None:
         self.type = type
         self.position = position
+        self.has_box = False
 
 class State:
     dropoff_pos: list[Position]
@@ -85,6 +86,7 @@ class State:
     pickup_data: list[Space]
     actor_pos: list[Position]
     actor_dist: dict[ActorType, dict[ActorType, int]]
+    actors: list[Actor]
 
     def __init__(self, env: Environment, actors: list[Actor]) -> None:
         self.dropoff_pos = []
@@ -93,8 +95,27 @@ class State:
         self.pickup_data = []
         self.actor_pos = {}
         self.actor_dist = {} # manhattan distance
+        self.actors = []
         self._init_env_locations(env)
-        self._init_actor_locations(actors)
+        self._init_actors(actors)
+    
+    def is_terminal(self) -> bool:
+        # if an actor is holding a box
+        for a in self.actors:
+            if a.has_box:
+                return False
+
+        # if there are boxes still left to pickup
+        for p in self.pickup_data:
+            if p.num_blocks > 0:
+                return False
+        
+        # if the dropoff location hasnt been filled with boxes
+        for d in self.dropoff_data:
+            if d.num_blocks < d.max_blocks:
+                return False
+        
+        return True
 
     def _init_env_locations(self, env: Environment) -> None:
         for i in range(env.n):
@@ -107,8 +128,9 @@ class State:
                     self.pickup_pos.append(Position(i, j))
                     self.pickup_data.append(space)
 
-    def _init_actor_locations(self, actors: list[Actor]) -> None:
+    def _init_actors(self, actors: list[Actor]) -> None:
         for actor in actors:
+            self.actors.append(actor)
             self.actor_pos[actor.type] = (actor.position)
 
         for from_type, from_pos in self.actor_pos.items():
