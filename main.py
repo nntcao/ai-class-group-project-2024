@@ -7,11 +7,14 @@ class Position:
         x (int): The x value of the position vector
         y (int): The y value of the position vector
     """
+
     def __init__(self, x: int = 0, y: int = 0) -> None:
+        """Initialize position data"""
         self.x = x
         self.y = y
 
     def __str__(self) -> str:
+        """Convert Position to string of format '(x, y)'"""
         return "(" + str(self.x) + ", " + str(self.y) + ")"
 
 
@@ -32,6 +35,7 @@ class Space:
     """
 
     def __init__(self, type: SpaceType = SpaceType.EMPTY, num_blocks: int = 0, max_blocks: int = 5) -> None:
+        """Initialize Space class"""
         if num_blocks > max_blocks:
             raise ValueError("max blocks exceeded on space")
         if num_blocks < 0:
@@ -45,6 +49,7 @@ class Space:
         self._init_reward()
 
     def _init_reward(self):
+        """Initialize reward based on type (SpaceType)"""
         if self.type == SpaceType.EMPTY:
             self.reward = -1
         elif self.type == SpaceType.DROP_OFF:
@@ -54,6 +59,7 @@ class Space:
 
     
     def __str__(self) -> str:
+        """Convert Space to string of format '(SpaceType, num_blocks, max_blocks)'"""
         return "(" + str(self.type) + "," + str(self.num_blocks) + "," + str(self.max_blocks) + ")"
 
 class Environment:
@@ -67,26 +73,31 @@ class Environment:
     """
 
     def __init__(self, n: int = 5, m: int = 5) -> None:
+        """Initialize the Environment world"""
         self.n = n
         self.m = m
         self.pd_world = [[Space(max_blocks=0)
                           for _ in range(m)] for _ in range(n)]
 
     def set(self, pos: Position, space: Space) -> None:
+        """Set pos to be space in the environment"""
         if pos.x < 0 or self.n <= pos.x or pos.y < 0 or self.m <= pos.y:
             raise ValueError("cannot set space as position is out of bounds")
         self.pd_world[pos.x][pos.y] = space
 
     def at(self, pos: Position) -> Space:
+        """Return the space at pos in the environment"""
         if pos.x < 0 or self.n <= pos.x or pos.y < 0 or self.m <= pos.y:
             raise ValueError("cannot find space as position is out of bounds")
         return self.pd_world[pos.x][pos.y]
 
     def within_bounds(self, pos: Position) -> None:
+        """Checks if a Position pos is within the bounds of the environment"""
         return -1 < pos.x and pos.x < self.n and \
             -1 < pos.y and pos.y < self.m
 
     def __str__(self) -> str:
+        """Generates a string representing the environment"""
         res = ""
         for i in range(self.n):
             for j in range(self.m):
@@ -119,6 +130,7 @@ class Actor:
     """
 
     def __init__(self, type: ActorType, position: Position = Position(0, 0)) -> None:
+        """Initializes actor"""
         self.type = type
         self.position = position
         self.has_box = False
@@ -136,7 +148,9 @@ class State:
             Accessed by actor_dist[ActorType.RED][ActorType.BLUE], or actor_dist[ActorType.BLUE][ActorType.RED]
         actors (list[Actor]): the List of Actors in the State
     """
+
     def __init__(self, env: Environment, actors: list[Actor]) -> None:
+        """Initializes the State"""
         self.dropoff_pos = []
         self.dropoff_data = []
         self.pickup_pos = []
@@ -148,6 +162,14 @@ class State:
         self._init_actors(actors)
     
     def is_terminal(self) -> bool:
+        """Checks if the State is considered terminal.
+        
+        A state is considered terminal if no actors are holding boxes,
+            there are no more boxes left in the pick up locations,
+            and all dropoff locations are filled to the maximum
+            number of boxes.
+
+        """
         # if an actor is holding a box
         for a in self.actors:
             if a.has_box:
@@ -166,6 +188,7 @@ class State:
         return True
 
     def _init_env_locations(self, env: Environment) -> None:
+        """Initializes the dropoff and pickup positions/data"""
         for i in range(env.n):
             for j in range(env.m):
                 space = env.at(Position(i, j))
@@ -177,6 +200,7 @@ class State:
                     self.pickup_data.append(space)
 
     def _init_actors(self, actors: list[Actor]) -> None:
+        """Initializes the actors and their data"""
         for actor in actors:
             self.actors.append(actor)
             self.actor_pos[actor.type] = (actor.position)
@@ -193,6 +217,8 @@ class State:
                     self.actor_dist[from_type][to_type] = manhattan_dist
     
     def __str__(self) -> str:
+        """Convert to a string representing the dropoff locations, pickup locations,
+            then actor data."""
         res = "["
         for i in range(len(self.dropoff_pos)):
             if i != 0:
