@@ -147,15 +147,23 @@ class State:
     def __str__(self) -> str:
         res = "["
         for i in range(len(self.dropoff_pos)):
-            res += "(" + str(self.dropoff_pos[i]) + "," + str(self.dropoff_data[i]) + "),"
+            if i != 0:
+                res += ","
+            res += "(" + str(self.dropoff_pos[i]) + "," + str(self.dropoff_data[i]) + ")"
 
         res += "],\n["
         for i in range(len(self.pickup_pos)):
-            res += "(" + str(self.pickup_pos[i]) + "," + str(self.pickup_data[i]) + "),"
+            if i != 0:
+                res += ","
+            res += "(" + str(self.pickup_pos[i]) + "," + str(self.pickup_data[i]) + ")"
 
         res += "],\n["
+        add_comma = False
         for k, v in self.actor_pos.items():
+            if add_comma:
+                res += ","
             res += "(" + str(k) + "," + str(v) + "),"
+            add_comma = True
 
         res += "]"
         return res
