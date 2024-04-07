@@ -16,6 +16,11 @@ class SpaceType(Enum):
 
 
 class Space:
+    type: SpaceType
+    num_blocks: int
+    max_blocks: int
+    reward: int
+
     def __init__(self, type: SpaceType = SpaceType.EMPTY, num_blocks: int = 0, max_blocks: int = 5) -> None:
         if num_blocks > max_blocks:
             raise ValueError("max blocks exceeded on space")
@@ -31,6 +36,10 @@ class Space:
         return "(" + str(self.type) + "," + str(self.num_blocks) + "," + str(self.max_blocks) + ")"
 
 class Environment:
+    n: int # rows
+    m: int # cols
+    pd_world: list[list[Space]] # the world space
+
     def __init__(self, n: int = 5, m: int = 5) -> None:
         self.n = n
         self.m = m
@@ -74,6 +83,10 @@ class ActorType(Enum):
 
 
 class Actor:
+    type: ActorType
+    position: Position
+    has_box: bool
+
     def __init__(self, type: ActorType, position: Position = Position(0, 0)) -> None:
         self.type = type
         self.position = position
