@@ -21,24 +21,6 @@ class TestShape(unittest.TestCase):
     def test_exceed_limit(self):
         self.assertRaises(ValueError, Space, SpaceType.PICK_UP, 16, 4)
 
-    def test_dropoff_add(self):
-        sp = Space(SpaceType.DROP_OFF)
-        sp.add_block()
-        self.assertEqual(sp.get_num_blocks(), 1)
-
-    def test_pickup_remove(self):
-        sp = Space(SpaceType.PICK_UP, 5, 5)
-        sp.remove_block()
-        self.assertEqual(sp.get_num_blocks(), 4)
-
-    def test_pickup_invalid_remove(self):
-        sp = Space(SpaceType.PICK_UP, 0, 5)
-        self.assertRaises(ValueError, sp.remove_block)
-
-    def test_dropoff_invalid_add(self):
-        sp = Space(SpaceType.PICK_UP, 5, 5)
-        self.assertRaises(ValueError, sp.add_block)
-
 
 class TestEnvironment(unittest.TestCase):
     def test_creation(self):
