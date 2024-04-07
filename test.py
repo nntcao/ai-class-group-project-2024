@@ -21,6 +21,15 @@ class TestShape(unittest.TestCase):
     def test_exceed_limit(self):
         self.assertRaises(ValueError, Space, SpaceType.PICK_UP, 16, 4)
 
+    def test_empty_reward(self):
+        self.assertEqual(Space(SpaceType.EMPTY).reward, -1)
+
+    def test_dropoff_reward(self):
+        self.assertEqual(Space(SpaceType.DROP_OFF).reward, 13)
+
+    def test_pickup_reward(self):
+        self.assertEqual(Space(SpaceType.PICK_UP).reward, 13)
+
 
 class TestEnvironment(unittest.TestCase):
     def test_creation(self):
