@@ -38,5 +38,29 @@ class TestEnvironment(unittest.TestCase):
         self.assertEqual(env.at(Position(0, 0)).type, SpaceType.DROP_OFF)
 
 
+class TestState(unittest.TestCase):
+    def test_is_not_terminal(self):
+        env = Environment(n=5, m=5)
+        env.set(Position(0, 0), Space(SpaceType.DROP_OFF))
+        env.set(Position(2, 0), Space(SpaceType.DROP_OFF))
+        env.set(Position(3, 4), Space(SpaceType.DROP_OFF))
+        env.set(Position(0, 4), Space(SpaceType.PICK_UP, num_blocks=5))
+        env.set(Position(1, 3), Space(SpaceType.PICK_UP, num_blocks=5))
+        env.set(Position(4, 1), Space(SpaceType.PICK_UP, num_blocks=5))
+
+        state = State(env, [Actor(ActorType.BLUE, Position(3, 2)), Actor(ActorType.RED, Position(0, 4))])
+        self.assertEqual(state.is_terminal(), False)
+
+    
+    def test_is_terminal(self):
+        env_terminal = Environment(n=1, m=2)
+        env_terminal.set(Position(0, 0), Space(SpaceType.PICK_UP, 0, 5))
+        env_terminal.set(Position(0, 1), Space(SpaceType.DROP_OFF, 5, 5))
+
+        terminal_state = State(env_terminal, [])
+
+        self.assertEqual(terminal_state.is_terminal(), True)
+
+
 if __name__ == "__main__":
     unittest.main()
