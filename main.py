@@ -1,6 +1,12 @@
 from enum import Enum
 
 class Position:
+    """A class used to store position data
+    
+    Attributes:
+        x (int): The x value of the position vector
+        y (int): The y value of the position vector
+    """
     def __init__(self, x: int = 0, y: int = 0) -> None:
         self.x = x
         self.y = y
@@ -16,10 +22,14 @@ class SpaceType(Enum):
 
 
 class Space:
-    type: SpaceType
-    num_blocks: int
-    max_blocks: int
-    reward: int
+    """A class used to store Space data, like a Space on a tabletop board game
+    
+    Attributes:
+        type (SpaceType): represents the type of space encoding e.g. Empty, Pick Up, Drop Off
+        num_blocks (int): the number of blocks sitting on the space
+        max_blocks (int): the maximum number of blocks that can sit on the space
+        reward (int): the reward the space gives
+    """
 
     def __init__(self, type: SpaceType = SpaceType.EMPTY, num_blocks: int = 0, max_blocks: int = 5) -> None:
         if num_blocks > max_blocks:
@@ -47,9 +57,14 @@ class Space:
         return "(" + str(self.type) + "," + str(self.num_blocks) + "," + str(self.max_blocks) + ")"
 
 class Environment:
-    n: int # rows
-    m: int # cols
-    pd_world: list[list[Space]] # the world space
+    """Environment class representing a 2D board of Spaces
+
+    Attributes:
+        n (int): the number of rows in the 2D environment
+        m (int): the number of cols in the 2D environment
+        pd_world (list[list[Space]]): the board of Spaces
+    
+    """
 
     def __init__(self, n: int = 5, m: int = 5) -> None:
         self.n = n
@@ -94,9 +109,14 @@ class ActorType(Enum):
 
 
 class Actor:
-    type: ActorType
-    position: Position
-    has_box: bool
+    """Represents the Actor that can exist in an Environment
+
+    Attributes:
+        type (ActorType): represents the color of the Actor
+        position (Position): where the actor is located in 2D space
+        has_box (bool): if the actor is currently holding a box
+    
+    """
 
     def __init__(self, type: ActorType, position: Position = Position(0, 0)) -> None:
         self.type = type
@@ -104,14 +124,18 @@ class Actor:
         self.has_box = False
 
 class State:
-    dropoff_pos: list[Position]
-    dropoff_data: list[Space]
-    pickup_pos: list[Position]
-    pickup_data: list[Space]
-    actor_pos: list[Position]
-    actor_dist: dict[ActorType, dict[ActorType, int]]
-    actors: list[Actor]
+    """Class that represents a state in time of an Environment and Actors on it
 
+    Attributes:
+        dropoff_pos (list[Position]): the Positions where dropoff locations are, same index as dropoff_data
+        dropoff_data (list[Space]): the Space data of each dropoff location, same index as dropoff_pos
+        pickup_pos (list[Position]): the Positions where pickup locations are, same index as pickup_data
+        pickup_data (list[Space]): the Space data of each pickup location, same index as pickup_pos
+        actor_pos (list[Position]): the Positions of where each Actor is
+        actor_dist (dict[ActorType, dict[ActorType, int]]): the distances each Actor is from one another. 
+            Accessed by actor_dist[ActorType.RED][ActorType.BLUE], or actor_dist[ActorType.BLUE][ActorType.RED]
+        actors (list[Actor]): the List of Actors in the State
+    """
     def __init__(self, env: Environment, actors: list[Actor]) -> None:
         self.dropoff_pos = []
         self.dropoff_data = []
