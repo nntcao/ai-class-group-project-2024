@@ -243,6 +243,8 @@ class State:
             actor.has_box = True
             blocksLeft = space.num_blocks - 1
 
+            print("\nActor: ", actor.type, " picked up at ", pos)
+
             i = self.pickup_data.index(space)
             if blocksLeft <= 0:
                 self.env.set(pos, Space(SpaceType.EMPTY))
@@ -252,9 +254,13 @@ class State:
             self.pickup_data[i] = self.env.at(pos)
             space = self.env.at(pos)
 
+            print("Blocks left: ", space.num_blocks)
+
         elif space.type == SpaceType.DROP_OFF and action == Direction.DROPOFF:
             actor.has_box = False
             blocksIn = space.num_blocks + 1
+
+            print("\nActor: ", actor.type, " dropped off at ", pos)
 
             i = self.dropoff_data.index(space)
             if blocksIn >= 5:
@@ -264,6 +270,8 @@ class State:
 
             self.dropoff_data[i] = self.env.at(pos)
             space = self.env.at(pos)
+
+            print("Blocks in: ", space.num_blocks)
     
     def __str__(self) -> str:
         """Convert to a string representing the dropoff locations, pickup locations,
@@ -358,6 +366,32 @@ def transition(current_pos: Position, action: Direction) -> Position:
     # Here, let's assume an infinite grid where all states are valid
     return next_pos
 
+def model(current_state: State, actor, action, policy, q_table):
+    actors_list = []
+    for actors in current_state.actors:
+        actor_copy = deepcopy(actors)
+        pos_copy = deepcopy(current_state.actor_pos[actors])
+        actors_list.append(Actor(actor_copy.type, pos_copy))
+
+    env_copy = deepcopy(current_state.env)
+    next_state = State(env_copy, actors_list)
+    
+    for actors in next_state.actors:
+        if actors.type == actor.type:
+            next_actor = actors
+            if actor.has_box == True:
+                next_actor.has_box = True
+
+    next_action, _ = policy(next_state, next_state.env, next_actor, q_table)
+
+    if action == Direction.PICKUP or action == Direction.DROPOFF:
+        print('\nIn model.')
+        print('Passed in actor has box: ', actor.has_box)
+        print('Actor copy has box: ', next_actor.has_box)
+        print("Next action: ", next_action)
+    return next_action
+
+
 def Q_learning(action: Direction, Q_table, actor, policy, gamma, alpha, current_state: State):
 
     current_pos = current_state.actor_pos[actor]
@@ -374,10 +408,8 @@ def Q_learning(action: Direction, Q_table, actor, policy, gamma, alpha, current_
 
     current_q = Q_table.get_q(current_pos, action)
 
-    next_state = deepcopy(current_state)
-    next_state.update(actor, next_pos, action) # New state
-
-    next_action, next_moves = policy(next_state, next_state.env, actor, Q_table)
+    current_state.update(actor, next_pos, action)
+    _, next_moves = policy(current_state, current_state.env, actor, Q_table)
 
     max_q_next = 0
     for a in next_moves:
@@ -388,16 +420,18 @@ def Q_learning(action: Direction, Q_table, actor, policy, gamma, alpha, current_
     new_q_value = (1 - alpha) * current_q + alpha * (reward + gamma * max_q_next)
     Q_table.set_q(current_pos, action, new_q_value)
 
-    current_state.update(actor, next_pos, action)
 
     
 
-def SARSA(action: Direction, Q_table, actor, policy, gamma, alpha, current_state: State):
+def SARSA(action: Direction, Q_table, actor: Actor, policy, gamma, alpha, current_state: State):
     current_pos = current_state.actor_pos[actor]
-    space = current_state.env.at(Position(current_pos.x, current_pos.y))
     current_q = Q_table.get_q(current_pos, action) # Q(S, A)
 
     next_pos = transition(current_pos, action) # S'
+
+    current_state.update(actor, next_pos, action)
+    current_pos = current_state.actor_pos[actor]
+    space = current_state.env.at(Position(current_pos.x, current_pos.y))
         
     if space.type == SpaceType.DROP_OFF and action == Direction.DROPOFF:
         reward = space.reward
@@ -406,11 +440,8 @@ def SARSA(action: Direction, Q_table, actor, policy, gamma, alpha, current_state
     else:
         reward = space.reward
 
-    current_state.update(actor, next_pos, action) # S' for taking A
-
-    next_action, next_operators = policy(current_state, current_state.env, actor, Q_table) # Choose A'
+    next_action = model(current_state, actor, action, policy, Q_table) # Choose A' from S'
     next_q = Q_table.get_q(next_pos, next_action) # Q(S', A')
-
     
     set_q = current_q + alpha * (reward + gamma * next_q - current_q)
     Q_table.set_q(current_pos, action, set_q) 
@@ -427,7 +458,6 @@ class Policy:
         checkY = current_state.actor_pos[actor].y
 
         checkSpace = env.at(Position(checkX, checkY))
-
         #checks if actor can pick up, if so actor picks up box and environment is updated
         if self.checkPickUp(current_state, checkSpace, actor) == True:
             action = Direction.PICKUP
@@ -564,9 +594,8 @@ class Run:
     def __init__(self, init_state: State, table: QTable) -> None:
         self.init_state = init_state
         self.table = table
-        self.policy = Policy()
 
-    def explore_q(self, gamma, alpha) -> QTable:
+    def explore_q(self, policy, gamma, alpha) -> QTable:
         print("\nStarting Q-Learning RANDOM...")
         current_state = deepcopy(self.init_state)
         for i in range(500):
@@ -576,19 +605,19 @@ class Run:
                 current_state = deepcopy(self.init_state)
         
             for actor in current_state.actors:
-                action, operators = self.policy.PRANDOM(current_state, current_state.env, actor, self.table)
-                Q_learning(action, self.table, actor, self.policy.PRANDOM, gamma, alpha, current_state)
+                action, operators = policy(current_state, current_state.env, actor, self.table)
+                Q_learning(action, self.table, actor, policy, gamma, alpha, current_state)
 
         self.current_state = current_state
         return self.table, current_state
     
-    def explore_sarsa(self, gamma, alpha) -> QTable:
+    def explore_sarsa(self, policy, gamma, alpha) -> QTable:
         print("\nStarting SARSA RANDOM...")
         current_state = deepcopy(self.init_state)
         next_action = {}
 
         for actor in current_state.actors:
-            next_action[actor], operators = self.policy.PRANDOM(current_state, current_state.env, actor, self.table)
+            next_action[actor], operators = policy(current_state, current_state.env, actor, self.table)
 
         for i in range(500):
             if current_state.is_terminal() == True:
@@ -596,14 +625,19 @@ class Run:
                 current_state = deepcopy(self.init_state)
                 next_action.clear()
                 for actor in current_state.actors:
-                    next_action[actor], operators = self.policy.PRANDOM(current_state, current_state.env, actor, self.table)
+                    next_action[actor], operators = policy(current_state, current_state.env, actor, self.table)
 
             for actor in current_state.actors:
-                next_action[actor] = SARSA(next_action[actor], self.table, actor, self.policy.PRANDOM, gamma, alpha, current_state)
-        
+                action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
+                next_action[actor] = action
+
+        print(current_state.actors[0].has_box, current_state.actors[1].has_box, current_state.actors[2].has_box)
+        print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
+        print(current_state.dropoff_data[0].num_blocks, current_state.dropoff_data[1].num_blocks, current_state.dropoff_data[2].num_blocks)
+        print(current_state.pickup_data[0].num_blocks, current_state.pickup_data[1].num_blocks, current_state.pickup_data[2].num_blocks)
         return self.table
 
-    def greedy_q(self, state, gamma, alpha) -> QTable:
+    def greedy_q(self, state, policy, gamma, alpha) -> QTable:
         current_state = deepcopy(self.init_state)
         print("\nStarting Q-Learning GREEDY...")
 
@@ -613,8 +647,8 @@ class Run:
                 current_state = deepcopy(state)
 
             for actor in current_state.actors:
-                action, operators = self.policy.PGREEDY(current_state, current_state.env, actor, self.table)
-                Q_learning(action, self.table, actor, self.policy.PGREEDY, gamma, alpha, current_state)    
+                action, operators = policy(current_state, current_state.env, actor, self.table)
+                Q_learning(action, self.table, actor, policy, gamma, alpha, current_state)    
         
         return self.table
 
@@ -641,18 +675,19 @@ def main():
     print(state)
 
     table_q = QTable()
+    policy = Policy()
 
-    exper = Run(state, table_q)
-    explore_q, current_state = exper.explore_q(gamma = 0.5, alpha = 0.3)
-    explore_q.print_table("q_table.csv")
+    #exper = Run(state, table_q)
+    #explore_q, current_state = exper.explore_q(policy.PRANDOM, gamma = 0.5, alpha = 0.3)
+    #explore_q.print_table("q_table.csv")
 
-    table_train_1a = Run(current_state, explore_q)
-    train_1a = table_train_1a.greedy_q(state, gamma = 0.5, alpha = 0.3)
-    train_1a.print_table("train_1a.csv")
+    #table_train_1a = Run(current_state, explore_q)
+    #train_1a = table_train_1a.greedy_q(state, policy.PGREEDY, gamma = 0.5, alpha = 0.3)
+    #train_1a.print_table("train_1a.csv")
 
     table_sarsa = QTable()
     exper_sarsa = Run(state, table_sarsa)
-    explore_sarsa = exper_sarsa.explore_sarsa(gamma = 0.5, alpha = 0.3)
+    explore_sarsa = exper_sarsa.explore_sarsa(policy.PRANDOM, gamma = 0.5, alpha = 0.3)
 
     explore_sarsa.print_table("sarsa_table.csv")
 
