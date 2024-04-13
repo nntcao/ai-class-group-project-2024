@@ -364,7 +364,7 @@ def transition(current_pos: Position, action: Direction) -> Position:
     # Here, let's assume an infinite grid where all states are valid
     return next_pos
 
-def model(current_state: State, actor, action, policy, q_table):
+def model(current_state: State, actor, next_pos, action, policy, q_table):
     actors_list = []
     for actors in current_state.actors:
         actor_copy = deepcopy(actors)
@@ -380,6 +380,7 @@ def model(current_state: State, actor, action, policy, q_table):
             if actor.has_box == True:
                 next_actor.has_box = True
 
+    next_state.update(next_actor, next_pos, action)
     next_action, _ = policy(next_state, next_state.env, next_actor, q_table)
     return next_action
 
@@ -387,19 +388,12 @@ def model(current_state: State, actor, action, policy, q_table):
 def Q_learning(action: Direction, actions: list[Direction], Q_table, actor, policy, gamma, alpha, current_state: State):
 
     current_pos = current_state.actor_pos[actor]
-    space = current_state.env.at(Position(current_pos.x, current_pos.y))
     current_q = Q_table.get_q(current_pos, action)
 
     next_pos = transition(current_pos, action)
-    
-    if space.type == SpaceType.DROP_OFF and action == Direction.DROPOFF:
-        reward = space.reward
-    elif space.type == SpaceType.PICK_UP and action == Direction.PICKUP:
-        reward = space.reward
-    else:
-        reward = space.reward
+    space = current_state.env.at(Position(next_pos.x, next_pos.y))
 
-    current_state.update(actor, next_pos, action)
+    reward = space.reward
 
     max_q_next = 0
     for a in actions:
@@ -410,32 +404,25 @@ def Q_learning(action: Direction, actions: list[Direction], Q_table, actor, poli
     new_q_value = (1 - alpha) * current_q + alpha * (reward + gamma * max_q_next)
     Q_table.set_q(current_pos, action, new_q_value)
 
-
+    current_state.update(actor, next_pos, action)
     
 
 def SARSA(action: Direction, Q_table, actor: Actor, policy, gamma, alpha, current_state: State):
     current_pos = current_state.actor_pos[actor]
     current_q = Q_table.get_q(current_pos, action) # Q(S, A)
-    space = current_state.env.at(Position(current_pos.x, current_pos.y))
-
+    
     next_pos = transition(current_pos, action) # S'
+    space = current_state.env.at(Position(next_pos.x, next_pos.y))
 
-    current_state.update(actor, next_pos, action)
-    current_pos = current_state.actor_pos[actor]
-      
-    if space.type == SpaceType.DROP_OFF and action == Direction.DROPOFF:
-        reward = space.reward
-    elif space.type == SpaceType.PICK_UP  and action == Direction.PICKUP:
-        reward = space.reward
-    else:
-        reward = space.reward
+    reward = space.reward
 
-    next_action = model(current_state, actor, action, policy, Q_table) # Choose A' from S'
+    next_action = model(current_state, actor, next_pos, action, policy, Q_table) # Choose A' from S'
     next_q = Q_table.get_q(next_pos, next_action) # Q(S', A')
     
     set_q = current_q + alpha * (reward + gamma * next_q - current_q)
     Q_table.set_q(current_pos, action, set_q) 
 
+    current_state.update(actor, next_pos, action)
     return next_action
 
     
