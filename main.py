@@ -143,6 +143,8 @@ class Actor:
         self.type = type
         self.position = position
         self.has_box = False
+        self.md_sum = {}
+        self.num_updates = {}
     
 
 class State:
@@ -166,7 +168,6 @@ class State:
         self.pickup_pos = []
         self.pickup_data = []
         self.actor_pos = {}
-        self.actor_dist = {} # manhattan distance
         self.actors = []
         self._init_env_locations(env)
         self._init_actors(actors)
@@ -216,16 +217,17 @@ class State:
             self.actors.append(actor)
             self.actor_pos[actor] = (actor.position)
 
-        for from_type, from_pos in self.actor_pos.items():
-            for to_type, to_pos in self.actor_pos.items():
+        for from_type in self.actors:
+            for to_type in self.actors:
                 if from_type == to_type: 
                     continue
 
+                from_pos = self.actor_pos[from_type]
+                to_pos = self.actor_pos[to_type]
                 manhattan_dist = abs(to_pos.x - from_pos.x) + abs(to_pos.y - from_pos.y)
-                if from_type not in self.actor_dist:
-                    self.actor_dist[from_type] = {to_type: manhattan_dist}
-                else:
-                    self.actor_dist[from_type][to_type] = manhattan_dist
+
+                from_type.md_sum[to_type] = manhattan_dist
+                from_type.num_updates[to_type] = 0
 
     def update(self, actor, pos: Position, action):
         self.actor_pos[actor] = pos
@@ -234,8 +236,9 @@ class State:
             if other == actor:
                 continue
 
-            if actor in self.actor_dist:
-                self.actor_dist[actor][other] = abs(pos.x - self.actor_pos[other].x) + abs(pos.y - self.actor_pos[other].y)
+            actor.md_sum[other] += abs(pos.x - self.actor_pos[other].x) + abs(pos.y - self.actor_pos[other].y)
+            actor.num_updates[other] += 1
+                
 
         space = self.env.at(pos)
         
@@ -597,7 +600,7 @@ class Run:
         print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
         print(current_state.dropoff_data[0].num_blocks, current_state.dropoff_data[1].num_blocks, current_state.dropoff_data[2].num_blocks)
         print(current_state.pickup_data[0].num_blocks, current_state.pickup_data[1].num_blocks, current_state.pickup_data[2].num_blocks)
-
+        self.print_avg_md(current_state)
 
         return self.table, current_state
     
@@ -625,7 +628,8 @@ class Run:
         print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
         print(current_state.dropoff_data[0].num_blocks, current_state.dropoff_data[1].num_blocks, current_state.dropoff_data[2].num_blocks)
         print(current_state.pickup_data[0].num_blocks, current_state.pickup_data[1].num_blocks, current_state.pickup_data[2].num_blocks)
-        
+        self.print_avg_md(current_state)
+
         return self.table, current_state
 
     def train_q(self, state, policy, gamma, alpha, exper) -> QTable:
@@ -640,6 +644,8 @@ class Run:
                 action, operators = policy(current_state, current_state.env, actor, self.table)
                 Q_learning(action, operators, self.table, actor, policy, gamma, alpha, current_state)    
         
+        self.print_avg_md(current_state)
+                
         return self.table
     
     def train_sarsa(self, state, policy, gamma, alpha, exper) -> QTable:
@@ -661,7 +667,9 @@ class Run:
             for actor in current_state.actors:
                 action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
                 next_action[actor] = action
-
+        
+        self.print_avg_md(current_state)
+         
         return self.table   
     
     def train_sarsa_change(self, state, policy, gamma, alpha, exper) -> QTable:
@@ -684,7 +692,9 @@ class Run:
             for actor in current_state.actors:
                 action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
                 next_action[actor] = action
-
+        
+        self.print_avg_md(current_state)
+         
         return self.table          
 
     def change_env(self, current_state: State) -> State:
@@ -710,6 +720,15 @@ class Run:
                     actor_copies.has_box = actor.has_box
         
         return new_state
+    
+    def print_avg_md(self, current_state):
+        for actor in current_state.actors:
+            print("\nActor: ", actor.type)
+            for other in current_state.actors:
+                if other == actor:
+                    continue
+
+                print("Average manhattan distance from ", other.type, ": ", actor.md_sum[other]/actor.num_updates[other])
     
 def main():
 
