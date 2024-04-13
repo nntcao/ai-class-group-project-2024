@@ -243,8 +243,6 @@ class State:
             actor.has_box = True
             blocksLeft = space.num_blocks - 1
 
-            print("\nActor: ", actor.type, " picked up at ", pos)
-
             i = self.pickup_data.index(space)
             if blocksLeft <= 0:
                 self.env.set(pos, Space(SpaceType.EMPTY))
@@ -254,13 +252,10 @@ class State:
             self.pickup_data[i] = self.env.at(pos)
             space = self.env.at(pos)
 
-            print("Blocks left: ", space.num_blocks)
 
         elif space.type == SpaceType.DROP_OFF and action == Direction.DROPOFF:
             actor.has_box = False
             blocksIn = space.num_blocks + 1
-
-            print("\nActor: ", actor.type, " dropped off at ", pos)
 
             i = self.dropoff_data.index(space)
             if blocksIn >= 5:
@@ -270,8 +265,6 @@ class State:
 
             self.dropoff_data[i] = self.env.at(pos)
             space = self.env.at(pos)
-
-            print("Blocks in: ", space.num_blocks)
     
     def __str__(self) -> str:
         """Convert to a string representing the dropoff locations, pickup locations,
@@ -324,13 +317,18 @@ class QTable:
 
     def get_max_action(self, state):
         state_index = (state.x, state.y)
-        max_action = None
+        actions = []
         max_q = float('-inf')
-        for action, q_value in self.table[state_index].items():
-            if q_value > max_q:
-                max_q = q_value
-                max_action = action
-        return max_action
+
+        for action in self.table[state_index]:
+            if self.table[state_index][action] == max_q:
+                max_q = self.table[state_index][action]
+                actions.append(action)
+            elif self.table[state_index][action] > max_q:
+                actions.clear()
+                max_q = self.table[state_index][action]
+                actions.append(action)
+        return actions
 
     def print_table(self, filename="q-table.csv"):
         with open(filename, 'w', newline='') as csvfile:
@@ -383,19 +381,14 @@ def model(current_state: State, actor, action, policy, q_table):
                 next_actor.has_box = True
 
     next_action, _ = policy(next_state, next_state.env, next_actor, q_table)
-
-    if action == Direction.PICKUP or action == Direction.DROPOFF:
-        print('\nIn model.')
-        print('Passed in actor has box: ', actor.has_box)
-        print('Actor copy has box: ', next_actor.has_box)
-        print("Next action: ", next_action)
     return next_action
 
 
-def Q_learning(action: Direction, Q_table, actor, policy, gamma, alpha, current_state: State):
+def Q_learning(action: Direction, actions: list[Direction], Q_table, actor, policy, gamma, alpha, current_state: State):
 
     current_pos = current_state.actor_pos[actor]
     space = current_state.env.at(Position(current_pos.x, current_pos.y))
+    current_q = Q_table.get_q(current_pos, action)
 
     next_pos = transition(current_pos, action)
     
@@ -406,16 +399,13 @@ def Q_learning(action: Direction, Q_table, actor, policy, gamma, alpha, current_
     else:
         reward = space.reward
 
-    current_q = Q_table.get_q(current_pos, action)
-
     current_state.update(actor, next_pos, action)
-    _, next_moves = policy(current_state, current_state.env, actor, Q_table)
 
     max_q_next = 0
-    for a in next_moves:
+    for a in actions:
         a_q = Q_table.get_q(next_pos, a)
         if a_q > max_q_next:
-            max_q_next = a_q
+            max_q_next = a_q # Q(s+1, a)
 
     new_q_value = (1 - alpha) * current_q + alpha * (reward + gamma * max_q_next)
     Q_table.set_q(current_pos, action, new_q_value)
@@ -426,13 +416,13 @@ def Q_learning(action: Direction, Q_table, actor, policy, gamma, alpha, current_
 def SARSA(action: Direction, Q_table, actor: Actor, policy, gamma, alpha, current_state: State):
     current_pos = current_state.actor_pos[actor]
     current_q = Q_table.get_q(current_pos, action) # Q(S, A)
+    space = current_state.env.at(Position(current_pos.x, current_pos.y))
 
     next_pos = transition(current_pos, action) # S'
 
     current_state.update(actor, next_pos, action)
     current_pos = current_state.actor_pos[actor]
-    space = current_state.env.at(Position(current_pos.x, current_pos.y))
-        
+      
     if space.type == SpaceType.DROP_OFF and action == Direction.DROPOFF:
         reward = space.reward
     elif space.type == SpaceType.PICK_UP  and action == Direction.PICKUP:
@@ -465,7 +455,7 @@ class Policy:
         #checks if actor can drop off, if so actor drops off box and environment is updated
         elif self.checkDropOff(current_state, checkSpace, actor) == True:
             action = Direction.DROPOFF
-            operator.append(Direction.PICKUP)
+            operator.append(Direction.DROPOFF)
         else:
             operator = self.valid_actions(current_state, current_state.actor_pos[actor], actor)
 
@@ -478,13 +468,13 @@ class Policy:
 
         return action, operator
 
-    def PGREEDY(self, current_state: State, env: Environment, actor, qTable: QTable) -> Direction:
+    def PGREEDY(self, current_state: State, env: Environment, actor: Actor, qTable: QTable) -> Direction:
         operator = []
 
         checkX = current_state.actor_pos[actor].x
         checkY = current_state.actor_pos[actor].y
         checkSpace = env.at(Position(checkX, checkY))
-
+        
         #checks if actor can pick up, if so actor picks up box and environment is updated
         if self.checkPickUp(current_state, checkSpace, actor) == True:
             action = Direction.PICKUP
@@ -496,49 +486,57 @@ class Policy:
         else:
             #choose random max q value as move
             operator = self.valid_actions(current_state, current_state.actor_pos[actor], actor)
-            best_action = qTable.get_max_action(current_state.actor_pos[actor])
+            best_actions = qTable.get_max_action(current_state.actor_pos[actor])
 
-            if len(operator) != 0:
-                if best_action in operator:
-                    action = best_action
-                    operator.append(action)
+            if len(operator) != 0 and len(best_actions) != 0:
+                for actions in best_actions:
+                    if actions not in operator:
+                        best_actions.remove(actions)
+
+                if len(best_actions) != 0:
+                    action = random.choice(best_actions)
                 else:
                     action = random.choice(operator)
-                    operator.append(action)
             else:
                 action = Direction.IDLE
                 operator.append(action)
-                
+            
         return action, operator
     
-    def PEXPLOIT(self, current_state: State, env: Environment, qTable, gamma, alpha) -> list[Direction]:
+    def PEXPLOIT(self, current_state: State, env: Environment, actor, qTable: QTable) -> list[Direction]:
         operator = []
-        i = 0
-        for actor in current_state.actors:
-            checkX = current_state.actor_pos[actor].x
-            checkY = current_state.actor_pos[actor].y
-            checkSpace = env.at(Position(checkX, checkY))
-            #checks if actor can pick up, if so actor picks up box and environment is updated
-            if self.checkPickUp(current_state, checkSpace, actor) == True:
-                operator.append(Direction.PICKUP)
-            #checks if actor can drop off, if so actor drops off box and environment is updated
-            elif self.checkDropOff(current_state, checkSpace, actor) == True:
-                operator.append(Direction.DROPOFF)
+
+        checkX = current_state.actor_pos[actor].x
+        checkY = current_state.actor_pos[actor].y
+
+        checkSpace = env.at(Position(checkX, checkY))
+        #checks if actor can pick up, if so actor picks up box and environment is updated
+        if self.checkPickUp(current_state, checkSpace, actor) == True:
+            action = Direction.PICKUP
+            operator.append(Direction.PICKUP)
+        #checks if actor can drop off, if so actor drops off box and environment is updated
+        elif self.checkDropOff(current_state, checkSpace, actor) == True:
+            action = Direction.DROPOFF
+            operator.append(Direction.DROPOFF)
+        else:
+            operator = self.valid_actions(current_state, current_state.actor_pos[actor], actor)
+            best_actions = qTable.get_max_action(current_state.actor_pos[actor])
+
+            for actions in best_actions[:]:
+                if actions not in operator:
+                    best_actions.remove(actions)
+
+            # Randomly chooses between max q value action(.8) or valid random action(.2)
+            if(random.random() > 0.2 and len(best_actions) != 0):
+                action = random.choice(best_actions)
             else:
-                #creates 2 lists, 1 for max q values, 1 for valid random actions   
-                qActions = np.argmax(qTable[current_state.actor_pos[actor]])
-                qAction = random.choice(qActions)
-                actions = self.valid_actions(current_state, current_state.actor_pos[actor], actor)
-                action = random.choice(actions)
-                # Randomly chooses between max q value action(.8) or valid random action(.2)
-                if(random.random() < 0.8):
-                    operator.append(qAction)
+                if len(operator) != 0:
+                    action = random.choice(operator)
                 else:
-                    operator.append(action)
-            i += 1
-        #Updates Q table using function, switch to sarsa function if running sarsa
-        Q_learning(operator, transition, qTable, gamma, alpha, actions, current_state)
-        return operator
+                    action = Direction.IDLE
+
+
+        return action, operator
     
     def valid_actions(self, current_state: State, position, actor: Actor) -> list[Direction]:
         actions = []
@@ -596,7 +594,7 @@ class Run:
         self.table = table
 
     def explore_q(self, policy, gamma, alpha) -> QTable:
-        print("\nStarting Q-Learning RANDOM...")
+        print("\nStarting Q-Learning explore...")
         current_state = deepcopy(self.init_state)
         for i in range(500):
             # If state is terminal, reset PD-world but not Q-Table
@@ -606,13 +604,18 @@ class Run:
         
             for actor in current_state.actors:
                 action, operators = policy(current_state, current_state.env, actor, self.table)
-                Q_learning(action, self.table, actor, policy, gamma, alpha, current_state)
+                Q_learning(action, operators, self.table, actor, policy, gamma, alpha, current_state)
 
-        self.current_state = current_state
+        print(current_state.actors[0].has_box, current_state.actors[1].has_box, current_state.actors[2].has_box)
+        print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
+        print(current_state.dropoff_data[0].num_blocks, current_state.dropoff_data[1].num_blocks, current_state.dropoff_data[2].num_blocks)
+        print(current_state.pickup_data[0].num_blocks, current_state.pickup_data[1].num_blocks, current_state.pickup_data[2].num_blocks)
+
+
         return self.table, current_state
     
     def explore_sarsa(self, policy, gamma, alpha) -> QTable:
-        print("\nStarting SARSA RANDOM...")
+        print("\nStarting SARSA explore...")
         current_state = deepcopy(self.init_state)
         next_action = {}
 
@@ -635,36 +638,102 @@ class Run:
         print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
         print(current_state.dropoff_data[0].num_blocks, current_state.dropoff_data[1].num_blocks, current_state.dropoff_data[2].num_blocks)
         print(current_state.pickup_data[0].num_blocks, current_state.pickup_data[1].num_blocks, current_state.pickup_data[2].num_blocks)
-        return self.table
+        
+        return self.table, current_state
 
-    def greedy_q(self, state, policy, gamma, alpha) -> QTable:
-        current_state = deepcopy(self.init_state)
-        print("\nStarting Q-Learning GREEDY...")
-
-        for i in range(500):
+    def train_q(self, state, policy, gamma, alpha, exper) -> QTable:
+        print("\nStarting Q-Learning train...")
+        current_state = deepcopy(state)
+        for i in range(8500):
             if current_state.is_terminal() == True:
-                print("Terminal state reached in greedy_q.")
-                current_state = deepcopy(state)
+                print("Terminal state reached in", exper)
+                current_state = deepcopy(self.init_state)
 
             for actor in current_state.actors:
                 action, operators = policy(current_state, current_state.env, actor, self.table)
-                Q_learning(action, self.table, actor, policy, gamma, alpha, current_state)    
+                Q_learning(action, operators, self.table, actor, policy, gamma, alpha, current_state)    
         
         return self.table
+    
+    def train_sarsa(self, state, policy, gamma, alpha, exper) -> QTable:
+        print("\nStarting SARSA train...")
+        current_state = deepcopy(state)
+        next_action = {}
 
+        for actor in current_state.actors:
+            next_action[actor], _ = policy(current_state, current_state.env, actor, self.table)
+
+        for i in range(8500):
+            if current_state.is_terminal() == True:
+                print("Terminal state reached in", exper)
+                current_state = deepcopy(self.init_state)
+                next_action.clear()
+                for actor in current_state.actors:
+                    next_action[actor], _ = policy(current_state, current_state.env, actor, self.table)
+
+            for actor in current_state.actors:
+                action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
+                next_action[actor] = action
+
+        return self.table   
+    
+    def train_sarsa_change(self, state, policy, gamma, alpha, exper) -> QTable:
+        print("\nStarting SARSA train...")
+        current_state = deepcopy(state)
+        next_action = {}
+
+        for actor in current_state.actors:
+            next_action[actor], _ = policy(current_state, current_state.env, actor, self.table)
+
+        for i in range(8500):
+            if current_state.is_terminal() == True:
+                print("Terminal state reached in", exper)
+
+                current_state = self.change_env(current_state)
+                next_action.clear()
+                for actor in current_state.actors:
+                    next_action[actor], _ = policy(current_state, current_state.env, actor, self.table)
+
+            for actor in current_state.actors:
+                action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
+                next_action[actor] = action
+
+        return self.table          
+
+    def change_env(self, current_state: State) -> State:
+        actors_list = []
+        for actors in current_state.actors:
+            actor_copy = deepcopy(actors)
+            pos_copy = deepcopy(current_state.actor_pos[actors])
+            actors_list.append(Actor(actor_copy.type, pos_copy))
+
+        env = Environment(n=5, m=5)
+        env.set(Position(0, 0), Space(SpaceType.DROP_OFF))
+        env.set(Position(0, 2), Space(SpaceType.DROP_OFF))
+        env.set(Position(4, 3), Space(SpaceType.DROP_OFF))
+        env.set(Position(4, 2), Space(SpaceType.PICK_UP, num_blocks=5))
+        env.set(Position(3, 3), Space(SpaceType.PICK_UP, num_blocks=5))
+        env.set(Position(2, 4), Space(SpaceType.PICK_UP, num_blocks=5))                
+
+        new_state = State(env, actors_list)
+
+        for actor in current_state.actors:
+            for actor_copies in new_state.actors:
+                if actor.type == actor_copies.type:
+                    actor_copies.has_box = actor.has_box
+        
+        return new_state
     
 def main():
-    seed = 123
-    np.random.seed(seed)
-    random.seed(seed)
 
+    # Initialize environment
     env = Environment(n=5, m=5)
     env.set(Position(0, 0), Space(SpaceType.DROP_OFF))
-    env.set(Position(0, 2), Space(SpaceType.DROP_OFF))
-    env.set(Position(4, 3), Space(SpaceType.DROP_OFF))
-    env.set(Position(4, 0), Space(SpaceType.PICK_UP, num_blocks=5))
-    env.set(Position(3, 1), Space(SpaceType.PICK_UP, num_blocks=5))
-    env.set(Position(2, 4), Space(SpaceType.PICK_UP, num_blocks=5))
+    env.set(Position(2, 0), Space(SpaceType.DROP_OFF))
+    env.set(Position(3, 4), Space(SpaceType.DROP_OFF))
+    env.set(Position(0, 4), Space(SpaceType.PICK_UP, num_blocks=5))
+    env.set(Position(1, 3), Space(SpaceType.PICK_UP, num_blocks=5))
+    env.set(Position(4, 1), Space(SpaceType.PICK_UP, num_blocks=5))
     print(env)
     
     Red = Actor(ActorType.RED, Position(2, 2))
@@ -674,23 +743,237 @@ def main():
     state = State(env, actors)
     print(state)
 
-    table_q = QTable()
-    policy = Policy()
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 1.1                                #
+    #                                                                              #
+    ################################################################################
 
-    #exper = Run(state, table_q)
-    #explore_q, current_state = exper.explore_q(policy.PRANDOM, gamma = 0.5, alpha = 0.3)
-    #explore_q.print_table("q_table.csv")
+    seed = 11
+    np.random.seed(seed)
+    random.seed(seed)
 
-    #table_train_1a = Run(current_state, explore_q)
-    #train_1a = table_train_1a.greedy_q(state, policy.PGREEDY, gamma = 0.5, alpha = 0.3)
-    #train_1a.print_table("train_1a.csv")
+    table_q_1_1 = QTable()
+    policy_q_1_1 = Policy()
 
-    table_sarsa = QTable()
-    exper_sarsa = Run(state, table_sarsa)
-    explore_sarsa = exper_sarsa.explore_sarsa(policy.PRANDOM, gamma = 0.5, alpha = 0.3)
+    # Run QLearning PRANDOM for 500 steps
+    exper = Run(state, table_q_1_1)
+    explore_q_1, current_q_1 = exper.explore_q(policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3)
+    explore_q_1.print_table("1_1_explore.csv")
 
-    explore_sarsa.print_table("sarsa_table.csv")
+    # 1a. Run QLearning PRANDOM for remaining 8500 steps
+    table_1a_1 = deepcopy(explore_q_1)
+    train_1a_1 = Run(state, table_1a_1)
+    result_1a_1 = train_1a_1.train_q(current_q_1, policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3, exper="1a")
+    result_1a_1.print_table("1a_1.csv")
 
+    # 1b. Run QLearning PGREEDY for remaining 8500 steps
+    table_1b_1 = deepcopy(explore_q_1)
+    train_1b_1 = Run(state, table_1b_1)
+    result_1b_1 = train_1b_1.train_q(current_q_1, policy_q_1_1.PGREEDY, gamma = 0.5, alpha = 0.3, exper="1b")
+    result_1b_1.print_table("1b_1.csv")
+
+    # 1c. Run QLearning PEXPLOIT for remaining 8500 steps
+    table_1c_1 = deepcopy(explore_q_1)
+    train_1c_1 = Run(state, table_1c_1)
+    result_1c_1 = train_1c_1.train_q(current_q_1, policy_q_1_1.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="1c")
+    result_1c_1.print_table("1c_1.csv")
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 1.2                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 12
+    np.random.seed(seed)
+    random.seed(seed)
+
+    table_q_1_2 = QTable()
+    policy_q_1_2 = Policy()
+
+    # Run QLearning PRANDOM for 500 steps
+    exper = Run(state, table_q_1_2)
+    explore_q_2, current_q_2 = exper.explore_q(policy_q_1_2.PRANDOM, gamma = 0.5, alpha = 0.3)
+    explore_q_2.print_table("1_2_explore.csv")
+
+    # 1a. Run QLearning PRANDOM for remaining 8500 steps
+    table_1a_2 = deepcopy(explore_q_2)
+    train_1a_2 = Run(state, table_1a_2)
+    result_1a_2 = train_1a_2.train_q(current_q_2, policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3, exper="1a")
+    result_1a_2.print_table("1a_2.csv")
+
+    # 1b. Run QLearning PGREEDY for remaining 8500 steps
+    table_1b_2 = deepcopy(explore_q_2)
+    train_1b_2 = Run(state, table_1b_2)
+    result_1b_2 = train_1b_2.train_q(current_q_2, policy_q_1_1.PGREEDY, gamma = 0.5, alpha = 0.3, exper="1b")
+    result_1b_2.print_table("1b_2.csv")
+
+    # 1c. Run QLearning PEXPLOIT for remaining 8500 steps
+    table_1c_2 = deepcopy(explore_q_2)
+    train_1c_2 = Run(state, table_1c_2)
+    result_1c_2 = train_1c_2.train_q(current_q_2, policy_q_1_1.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="1c")
+    result_1c_2.print_table("1c_1.csv")
+
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 2.1                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 21
+    np.random.seed(seed)
+    random.seed(seed)
+
+    # Run SARSA PRANDOM for 500 steps
+    policy_s_1 = Policy()
+    table_sarsa_1 = QTable()
+
+    exper_sarsa_1 = Run(state, table_sarsa_1)
+    explore_sarsa_1, current_sarsa_1 = exper_sarsa_1.explore_sarsa(policy_s_1.PRANDOM, gamma = 0.5, alpha = 0.3)
+    explore_sarsa_1.print_table("2_1_explore.csv")
+
+    # Run SARSA PEXPLOIT for remaining 8500 steps
+    table_2_1 = deepcopy(explore_sarsa_1)
+    train_2_1 = Run(state, table_2_1)
+    result_2_1 = train_2_1.train_sarsa(current_sarsa_1, policy_s_1.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="2")
+    result_2_1.print_table("2_1_result.csv")
+
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 2.2                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 22
+    np.random.seed(seed)
+    random.seed(seed)
+
+    # Run SARSA PRANDOM for 500 steps
+    policy_s_2 = Policy()
+    table_sarsa_2 = QTable()
+
+    exper_sarsa_2 = Run(state, table_sarsa_2)
+    explore_sarsa_2, current_sarsa_2 = exper_sarsa_2.explore_sarsa(policy_s_2.PRANDOM, gamma = 0.5, alpha = 0.3)
+    explore_sarsa_2.print_table("2_2_explore.csv")
+
+    # Run SARSA PEXPLOIT for remaining 8500 steps
+    table_2_2 = deepcopy(explore_sarsa_2)
+    train_2_2 = Run(state, table_2_2)
+    result_2_2 = train_2_2.train_sarsa(current_sarsa_2, policy_s_2.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="2")
+    result_2_2.print_table("2_2_result.csv")    
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 3.1                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 31
+    np.random.seed(seed)
+    random.seed(seed)
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.15
+    policy_s3_1 = Policy()
+    table_sarsa3_1 = QTable()
+
+    exper_sarsa3_1 = Run(state, table_sarsa3_1)
+    explore_sarsa3_1, current_sarsa3_1 = exper_sarsa3_1.explore_sarsa(policy_s3_1.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa3_1.print_table("3_1_explore.csv")    
+
+    table_3_1_15 = deepcopy(explore_sarsa_1)
+    train_3_1_15 = Run(state, table_3_1_15)
+    result_3_1_15 = train_3_1_15.train_sarsa(current_sarsa3_1, policy_s3_1.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="3")
+    result_3_1_15.print_table("3_1_result_a15.csv")
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.45
+
+    table_3_1_45 = deepcopy(explore_sarsa_1)
+    train_3_1_45 = Run(state, table_3_1_45)
+    result_3_1_45 = train_3_1_45.train_sarsa(current_sarsa3_1, policy_s3_1.PEXPLOIT, gamma = 0.5, alpha = 0.45, exper="3")
+    result_3_1_45.print_table("3_1_result_a45.csv")
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 3.2                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 32
+    np.random.seed(seed)
+    random.seed(seed)
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.15
+    policy_s3_2 = Policy()
+    table_sarsa3_2 = QTable()
+
+    exper_sarsa3_2 = Run(state, table_sarsa3_2)
+    explore_sarsa3_2, current_sarsa3_2 = exper_sarsa3_2.explore_sarsa(policy_s3_2.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa3_2.print_table("3_2_explore.csv")    
+
+    table_3_2_15 = deepcopy(explore_sarsa_2)
+    train_3_2_15 = Run(state, table_3_2_15)
+    result_3_2_15 = train_3_2_15.train_sarsa(current_sarsa3_2, policy_s3_2.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="3")
+    result_3_2_15.print_table("3_2_result_a15.csv")
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.45
+
+    table_3_2_45 = deepcopy(explore_sarsa_2)
+    train_3_2_45 = Run(state, table_3_2_45)
+    result_3_2_45 = train_3_2_45.train_sarsa(current_sarsa3_2, policy_s3_2.PEXPLOIT, gamma = 0.5, alpha = 0.45, exper="3")
+    result_3_2_45.print_table("3_2_result_a45.csv")
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 4.1                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 41
+    np.random.seed(seed)
+    random.seed(seed)
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.3 and gamma = 0.5
+    policy_s4_1 = Policy()
+    table_sarsa4_1 = QTable()
+
+    exper_sarsa4_1 = Run(state, table_sarsa4_1)
+    explore_sarsa4_1, current_sarsa4_1 = exper_sarsa4_1.explore_sarsa(policy_s4_1.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa4_1.print_table("4_1_explore.csv")    
+
+
+    # Change pickup locations after terminal state reached
+    table_4_1 = deepcopy(explore_sarsa4_1)
+    train_4_1 = Run(state, table_4_1)
+    result_4_1 = train_4_1.train_sarsa_change(current_sarsa4_1, policy_s4_1.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="4")
+    result_4_1.print_table("4_1_result.csv")
+
+    ################################################################################
+    #                                                                              #
+    #                                EXPERIMENT 4.2                                #
+    #                                                                              #
+    ################################################################################
+    
+    seed = 42
+    np.random.seed(seed)
+    random.seed(seed)
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.3 and gamma = 0.5
+    policy_s4_2 = Policy()
+    table_sarsa4_2 = QTable()
+
+    exper_sarsa4_2 = Run(state, table_sarsa4_2)
+    explore_sarsa4_2, current_sarsa4_2 = exper_sarsa4_2.explore_sarsa(policy_s4_2.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa4_2.print_table("4_2_explore.csv")    
+
+
+    # Change pickup locations after terminal state reached
+    table_4_2 = deepcopy(explore_sarsa4_2)
+    train_4_2 = Run(state, table_4_2)
+    result_4_2 = train_4_2.train_sarsa_change(current_sarsa4_2, policy_s4_2.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="4")
+    result_4_2.print_table("4_2_result.csv")
 
 
 if __name__ == "__main__":
