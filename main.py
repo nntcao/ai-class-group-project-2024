@@ -501,7 +501,7 @@ class Policy:
             
         return action, operator
     
-    def PEXPLOIT(self, current_state: State, env: Environmnt, actor, qTable: QTable) -> list[Direction]:
+    def PEXPLOIT(self, current_state: State, env: Environment, actor, qTable: QTable) -> list[Direction]:
         """Generates the EXPLOIT policy"""
         operator = []
 
