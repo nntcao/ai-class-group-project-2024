@@ -144,7 +144,7 @@ class Actor:
         self.position = position
         self.has_box = False
         self.md_sum = {}
-        self.num_updates = {}
+        self.num_updates = 1
     
 
 class State:
@@ -227,7 +227,7 @@ class State:
                 manhattan_dist = abs(to_pos.x - from_pos.x) + abs(to_pos.y - from_pos.y)
 
                 from_type.md_sum[to_type] = manhattan_dist
-                from_type.num_updates[to_type] = 0
+                from_type.num_updates = 1
 
     def update(self, actor, pos: Position, action):
         self.actor_pos[actor] = pos
@@ -237,7 +237,7 @@ class State:
                 continue
 
             actor.md_sum[other] += abs(pos.x - self.actor_pos[other].x) + abs(pos.y - self.actor_pos[other].y)
-            actor.num_updates[other] += 1
+            actor.num_updates += 1
                 
 
         space = self.env.at(pos)
@@ -741,8 +741,8 @@ class Run:
 
         env = Environment(n=5, m=5)
         env.set(Position(0, 0), Space(SpaceType.DROP_OFF))
-        env.set(Position(0, 2), Space(SpaceType.DROP_OFF))
-        env.set(Position(4, 3), Space(SpaceType.DROP_OFF))
+        env.set(Position(2, 0), Space(SpaceType.DROP_OFF))
+        env.set(Position(3, 4), Space(SpaceType.DROP_OFF))
         env.set(Position(4, 2), Space(SpaceType.PICK_UP, num_blocks=5))
         env.set(Position(3, 3), Space(SpaceType.PICK_UP, num_blocks=5))
         env.set(Position(2, 4), Space(SpaceType.PICK_UP, num_blocks=5))                
@@ -763,7 +763,7 @@ class Run:
                 if other == actor:
                     continue
 
-                print("Average manhattan distance from ", other.type, ": ", actor.md_sum[other]/actor.num_updates[other])
+                print("Average manhattan distance from ", other.type, ": ", actor.md_sum[other]/actor.num_updates)
     
 def main():
 
@@ -778,8 +778,8 @@ def main():
     print(env)
     
     Red = Actor(ActorType.RED, Position(2, 2))
-    Blue =  Actor(ActorType.BLUE, Position(2, 4))
-    Black = Actor(ActorType.BLACK, Position(2, 0))
+    Blue =  Actor(ActorType.BLUE, Position(4, 2))
+    Black = Actor(ActorType.BLACK, Position(0, 2))
     actors = [Red, Blue, Black]
     state = State(env, actors)
     print(state)
