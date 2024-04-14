@@ -156,7 +156,7 @@ class State:
         pickup_pos (list[Position]): the Positions where pickup locations are, same index as pickup_data
         pickup_data (list[Space]): the Space data of each pickup location, same index as pickup_pos
         actor_pos (list[Position]): the Positions of where each Actor is
-        actor_dist (dict[ActorType, dict[ActorType, int]]): the distances each Actor is from one another. 
+        actor_dist (dict[Actor, dict[Actor, int]]): the distances each Actor is from one another. 
             Accessed by actor_dist[ActorType.RED][ActorType.BLUE], or actor_dist[ActorType.BLUE][ActorType.RED]
         actors (list[Actor]): the List of Actors in the State
     """
@@ -296,6 +296,8 @@ class State:
         return res
 
 class QTable:
+    """Class for QTable representation"""
+
     def __init__(self):
         self.table = defaultdict(lambda: defaultdict(float))
 
@@ -343,7 +345,7 @@ class QTable:
 
 
 def transition(current_pos: Position, action: Direction) -> Position:
-    
+    """Generates position based on action and current position"""
     # Assuming a grid world with coordinates (x, y)
     x = current_pos.x
     y = current_pos.y
@@ -368,6 +370,7 @@ def transition(current_pos: Position, action: Direction) -> Position:
     return next_pos
 
 def model(current_state: State, actor, next_pos, action, policy, q_table):
+    """Generates the next action to take depending on state and policy"""
     actors_list = []
     for actors in current_state.actors:
         actor_copy = deepcopy(actors)
@@ -389,7 +392,7 @@ def model(current_state: State, actor, next_pos, action, policy, q_table):
 
 
 def Q_learning(action: Direction, actions: list[Direction], Q_table, actor, policy, gamma, alpha, current_state: State):
-
+    """Executes Q learning reinforcement training"""
     current_pos = current_state.actor_pos[actor]
     current_q = Q_table.get_q(current_pos, action)
 
@@ -411,6 +414,7 @@ def Q_learning(action: Direction, actions: list[Direction], Q_table, actor, poli
     
 
 def SARSA(action: Direction, Q_table, actor: Actor, policy, gamma, alpha, current_state: State):
+    """Executes SARSA reinforcement training"""
     current_pos = current_state.actor_pos[actor]
     current_q = Q_table.get_q(current_pos, action) # Q(S, A)
     
@@ -430,7 +434,10 @@ def SARSA(action: Direction, Q_table, actor: Actor, policy, gamma, alpha, curren
 
     
 class Policy:
+    """Class for generating policies that agents will folow"""
+
     def PRANDOM(self, current_state: State, env: Environment, actor, qTable) -> Direction:
+        """Generates the RANDOM policy"""
         operator = []
 
         #stores actor pos as a space
@@ -459,6 +466,7 @@ class Policy:
         return action, operator
 
     def PGREEDY(self, current_state: State, env: Environment, actor: Actor, qTable: QTable) -> Direction:
+        """Generates the GREEDY policy"""
         operator = []
 
         checkX = current_state.actor_pos[actor].x
@@ -493,7 +501,8 @@ class Policy:
             
         return action, operator
     
-    def PEXPLOIT(self, current_state: State, env: Environment, actor, qTable: QTable) -> list[Direction]:
+    def PEXPLOIT(self, current_state: State, env: Environmnt, actor, qTable: QTable) -> list[Direction]:
+        """Generates the EXPLOIT policy"""
         operator = []
 
         checkX = current_state.actor_pos[actor].x
@@ -529,6 +538,7 @@ class Policy:
         return action, operator
     
     def valid_actions(self, current_state: State, position, actor: Actor) -> list[Direction]:
+        """Generates valid actions based on state and actor"""
         actions = []
 
         if self.check_position(current_state, (position.x+1, position.y), actor) == True: # NORTH
@@ -579,6 +589,7 @@ class Policy:
         return False
     
 class Run:
+    """Class to run the reinforcement training"""
     def __init__(self, init_state: State, table: QTable) -> None:
         self.init_state = init_state
         self.table = table
