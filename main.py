@@ -585,16 +585,20 @@ class Run:
 
     def explore_q(self, policy, gamma, alpha) -> QTable:
         print("\nStarting Q-Learning explore...")
+        num_terms = 0
         current_state = deepcopy(self.init_state)
         for i in range(500):
             # If state is terminal, reset PD-world but not Q-Table
             if current_state.is_terminal() == True:
                 print("Terminal state reached in explore_q.")
+                num_terms += 1
                 current_state = deepcopy(self.init_state)
         
             for actor in current_state.actors:
                 action, operators = policy(current_state, current_state.env, actor, self.table)
                 Q_learning(action, operators, self.table, actor, policy, gamma, alpha, current_state)
+
+        print("Number of times terminal state was reached: ", num_terms)
 
         print(current_state.actors[0].has_box, current_state.actors[1].has_box, current_state.actors[2].has_box)
         print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
@@ -606,6 +610,7 @@ class Run:
     
     def explore_sarsa(self, policy, gamma, alpha) -> QTable:
         print("\nStarting SARSA explore...")
+        num_terms = 0
         current_state = deepcopy(self.init_state)
         next_action = {}
 
@@ -615,6 +620,7 @@ class Run:
         for i in range(500):
             if current_state.is_terminal() == True:
                 print("Terminal state reached in explore_sarsa.")
+                num_terms += 1
                 current_state = deepcopy(self.init_state)
                 next_action.clear()
                 for actor in current_state.actors:
@@ -623,6 +629,8 @@ class Run:
             for actor in current_state.actors:
                 action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
                 next_action[actor] = action
+
+        print("Number of times terminal state was reached: ", num_terms)
 
         print(current_state.actors[0].has_box, current_state.actors[1].has_box, current_state.actors[2].has_box)
         print(current_state.actor_pos[current_state.actors[0]], current_state.actor_pos[current_state.actors[1]], current_state.actor_pos[current_state.actors[2]])
@@ -634,22 +642,27 @@ class Run:
 
     def train_q(self, state, policy, gamma, alpha, exper) -> QTable:
         print("\nStarting Q-Learning train...")
+        num_terms = 0
         current_state = deepcopy(state)
         for i in range(8500):
             if current_state.is_terminal() == True:
                 print("Terminal state reached in", exper)
+                num_terms += 1
                 current_state = deepcopy(self.init_state)
 
             for actor in current_state.actors:
                 action, operators = policy(current_state, current_state.env, actor, self.table)
                 Q_learning(action, operators, self.table, actor, policy, gamma, alpha, current_state)    
         
+        print("Number of times terminal state was reached: ", num_terms)
+
         self.print_avg_md(current_state)
                 
         return self.table
     
     def train_sarsa(self, state, policy, gamma, alpha, exper) -> QTable:
         print("\nStarting SARSA train...")
+        num_terms = 0
         current_state = deepcopy(state)
         next_action = {}
 
@@ -659,6 +672,7 @@ class Run:
         for i in range(8500):
             if current_state.is_terminal() == True:
                 print("Terminal state reached in", exper)
+                num_terms += 1
                 current_state = deepcopy(self.init_state)
                 next_action.clear()
                 for actor in current_state.actors:
@@ -668,12 +682,15 @@ class Run:
                 action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
                 next_action[actor] = action
         
+        print("Number of times terminal state was reached: ", num_terms)
+
         self.print_avg_md(current_state)
          
         return self.table   
     
     def train_sarsa_change(self, state, policy, gamma, alpha, exper) -> QTable:
         print("\nStarting SARSA train...")
+        num_terms = 0
         current_state = deepcopy(state)
         next_action = {}
 
@@ -683,7 +700,7 @@ class Run:
         for i in range(8500):
             if current_state.is_terminal() == True:
                 print("Terminal state reached in", exper)
-
+                num_terms += 1
                 current_state = self.change_env(current_state)
                 next_action.clear()
                 for actor in current_state.actors:
@@ -692,7 +709,9 @@ class Run:
             for actor in current_state.actors:
                 action = SARSA(next_action[actor], self.table, actor, policy, gamma, alpha, current_state)
                 next_action[actor] = action
-        
+
+        print("Number of times terminal state was reached: ", num_terms)
+
         self.print_avg_md(current_state)
          
         return self.table          
@@ -755,6 +774,8 @@ def main():
     #                                                                              #
     ################################################################################
 
+    print("\n---------Experiment 1.1---------")
+
     seed = 11
     np.random.seed(seed)
     random.seed(seed)
@@ -762,10 +783,14 @@ def main():
     table_q_1_1 = QTable()
     policy_q_1_1 = Policy()
 
+    print("\nRun Q-Learning PRANDOM for 500 steps")
+
     # Run QLearning PRANDOM for 500 steps
-    exper = Run(state, table_q_1_1)
-    explore_q_1, current_q_1 = exper.explore_q(policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3)
+    exper_1 = Run(state, table_q_1_1)
+    explore_q_1, current_q_1 = exper_1.explore_q(policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3)
     explore_q_1.print_table("1_1_explore.csv")
+
+    print("\nRun Q-Learning PRANDOM for remaining 8500 steps")
 
     # 1a. Run QLearning PRANDOM for remaining 8500 steps
     table_1a_1 = deepcopy(explore_q_1)
@@ -773,11 +798,15 @@ def main():
     result_1a_1 = train_1a_1.train_q(current_q_1, policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3, exper="1a")
     result_1a_1.print_table("1a_1.csv")
 
+    print("\nRun Q-Learning PGREEDY for remaining 8500 steps")
+
     # 1b. Run QLearning PGREEDY for remaining 8500 steps
     table_1b_1 = deepcopy(explore_q_1)
     train_1b_1 = Run(state, table_1b_1)
     result_1b_1 = train_1b_1.train_q(current_q_1, policy_q_1_1.PGREEDY, gamma = 0.5, alpha = 0.3, exper="1b")
     result_1b_1.print_table("1b_1.csv")
+
+    print("\nRun Q-Learning PEXPLOIT for remaining 8500 steps")
 
     # 1c. Run QLearning PEXPLOIT for remaining 8500 steps
     table_1c_1 = deepcopy(explore_q_1)
@@ -791,6 +820,8 @@ def main():
     #                                                                              #
     ################################################################################
     
+    print("\n---------Experiment 1.2---------")
+
     seed = 12
     np.random.seed(seed)
     random.seed(seed)
@@ -798,27 +829,35 @@ def main():
     table_q_1_2 = QTable()
     policy_q_1_2 = Policy()
 
+    print("\nRun Q-Learning PRANDOM for 500 steps")
+
     # Run QLearning PRANDOM for 500 steps
-    exper = Run(state, table_q_1_2)
-    explore_q_2, current_q_2 = exper.explore_q(policy_q_1_2.PRANDOM, gamma = 0.5, alpha = 0.3)
+    exper_2 = Run(state, table_q_1_2)
+    explore_q_2, current_q_2 = exper_2.explore_q(policy_q_1_2.PRANDOM, gamma = 0.5, alpha = 0.3)
     explore_q_2.print_table("1_2_explore.csv")
+
+    print("\nRun Q-Learning PRANDOM for remaining 8500 steps")
 
     # 1a. Run QLearning PRANDOM for remaining 8500 steps
     table_1a_2 = deepcopy(explore_q_2)
     train_1a_2 = Run(state, table_1a_2)
-    result_1a_2 = train_1a_2.train_q(current_q_2, policy_q_1_1.PRANDOM, gamma = 0.5, alpha = 0.3, exper="1a")
+    result_1a_2 = train_1a_2.train_q(current_q_2, policy_q_1_2.PRANDOM, gamma = 0.5, alpha = 0.3, exper="1a")
     result_1a_2.print_table("1a_2.csv")
+
+    print("\nRun Q-Learning PGREEDY for remaining 8500 steps")
 
     # 1b. Run QLearning PGREEDY for remaining 8500 steps
     table_1b_2 = deepcopy(explore_q_2)
     train_1b_2 = Run(state, table_1b_2)
-    result_1b_2 = train_1b_2.train_q(current_q_2, policy_q_1_1.PGREEDY, gamma = 0.5, alpha = 0.3, exper="1b")
+    result_1b_2 = train_1b_2.train_q(current_q_2, policy_q_1_2.PGREEDY, gamma = 0.5, alpha = 0.3, exper="1b")
     result_1b_2.print_table("1b_2.csv")
+
+    print("\nRun Q-Learning PEXPLOIT for remaining 8500 steps")
 
     # 1c. Run QLearning PEXPLOIT for remaining 8500 steps
     table_1c_2 = deepcopy(explore_q_2)
     train_1c_2 = Run(state, table_1c_2)
-    result_1c_2 = train_1c_2.train_q(current_q_2, policy_q_1_1.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="1c")
+    result_1c_2 = train_1c_2.train_q(current_q_2, policy_q_1_2.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="1c")
     result_1c_2.print_table("1c_1.csv")
 
 
@@ -828,9 +867,13 @@ def main():
     #                                                                              #
     ################################################################################
     
+    print("\n---------Experiment 2.1---------")
+
     seed = 21
     np.random.seed(seed)
     random.seed(seed)
+
+    print("\nRun Q-Learning PRANDOM for 500 steps")
 
     # Run SARSA PRANDOM for 500 steps
     policy_s_1 = Policy()
@@ -839,6 +882,8 @@ def main():
     exper_sarsa_1 = Run(state, table_sarsa_1)
     explore_sarsa_1, current_sarsa_1 = exper_sarsa_1.explore_sarsa(policy_s_1.PRANDOM, gamma = 0.5, alpha = 0.3)
     explore_sarsa_1.print_table("2_1_explore.csv")
+
+    print("\nRun SARSA PEXPLOIT for remaining 8500 steps")
 
     # Run SARSA PEXPLOIT for remaining 8500 steps
     table_2_1 = deepcopy(explore_sarsa_1)
@@ -853,9 +898,13 @@ def main():
     #                                                                              #
     ################################################################################
     
+    print("\n---------Experiment 2.2---------")
+
     seed = 22
     np.random.seed(seed)
     random.seed(seed)
+
+    print("\nRun SARSA PRANDOM for 500 steps")
 
     # Run SARSA PRANDOM for 500 steps
     policy_s_2 = Policy()
@@ -864,6 +913,8 @@ def main():
     exper_sarsa_2 = Run(state, table_sarsa_2)
     explore_sarsa_2, current_sarsa_2 = exper_sarsa_2.explore_sarsa(policy_s_2.PRANDOM, gamma = 0.5, alpha = 0.3)
     explore_sarsa_2.print_table("2_2_explore.csv")
+
+    print("\nRun SARSA PEXPLOIT for remaining 8500 steps")
 
     # Run SARSA PEXPLOIT for remaining 8500 steps
     table_2_2 = deepcopy(explore_sarsa_2)
@@ -877,28 +928,47 @@ def main():
     #                                                                              #
     ################################################################################
     
+    print("\n---------Experiment 3.1---------")
+
     seed = 31
     np.random.seed(seed)
     random.seed(seed)
 
+    print("\nRun SARSA PRANDOM for 500 steps, alpha = 0.15")
+
     # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.15
-    policy_s3_1 = Policy()
-    table_sarsa3_1 = QTable()
+    policy_s3_115 = Policy()
+    table_sarsa3_115 = QTable()
 
-    exper_sarsa3_1 = Run(state, table_sarsa3_1)
-    explore_sarsa3_1, current_sarsa3_1 = exper_sarsa3_1.explore_sarsa(policy_s3_1.PRANDOM, gamma = 0.5, alpha = 0.15)
-    explore_sarsa3_1.print_table("3_1_explore.csv")    
+    exper_sarsa3_115 = Run(state, table_sarsa3_115)
+    explore_sarsa3_115, current_sarsa3_115 = exper_sarsa3_115.explore_sarsa(policy_s3_115.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa3_115.print_table("3_1_a15_explore.csv")    
 
-    table_3_1_15 = deepcopy(explore_sarsa_1)
+    print("\nRun SARSA PEXPLOIT for remaining 8500 steps, alpha = 0.15")
+
+    table_3_1_15 = deepcopy(explore_sarsa3_115)
     train_3_1_15 = Run(state, table_3_1_15)
-    result_3_1_15 = train_3_1_15.train_sarsa(current_sarsa3_1, policy_s3_1.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="3")
+    result_3_1_15 = train_3_1_15.train_sarsa(current_sarsa3_115, policy_s3_115.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="3")
     result_3_1_15.print_table("3_1_result_a15.csv")
+
+    print("\nRun SARSA PRANDOM for 500 steps, alpha = 0.45")
+
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.45
+    policy_s3_145 = Policy()
+    table_sarsa3_145 = QTable()
+
+    exper_sarsa3_145 = Run(state, table_sarsa3_145)
+    explore_sarsa3_145, current_sarsa3_145 = exper_sarsa3_145.explore_sarsa(policy_s3_145.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa3_145.print_table("3_1_a45_explore.csv")  
+    
 
     # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.45
 
-    table_3_1_45 = deepcopy(explore_sarsa_1)
+    print("\nRun SARSA PEXPLOIT for remaining 8500 steps, alpha = 0.45")
+
+    table_3_1_45 = deepcopy(explore_sarsa3_145)
     train_3_1_45 = Run(state, table_3_1_45)
-    result_3_1_45 = train_3_1_45.train_sarsa(current_sarsa3_1, policy_s3_1.PEXPLOIT, gamma = 0.5, alpha = 0.45, exper="3")
+    result_3_1_45 = train_3_1_45.train_sarsa(current_sarsa3_145, policy_s3_145.PEXPLOIT, gamma = 0.5, alpha = 0.45, exper="3")
     result_3_1_45.print_table("3_1_result_a45.csv")
 
     ################################################################################
@@ -907,28 +977,49 @@ def main():
     #                                                                              #
     ################################################################################
     
-    seed = 32
+    print("\n---------Experiment 3.2---------")
+
+    seed = 3215
     np.random.seed(seed)
     random.seed(seed)
 
     # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.15
-    policy_s3_2 = Policy()
-    table_sarsa3_2 = QTable()
 
-    exper_sarsa3_2 = Run(state, table_sarsa3_2)
-    explore_sarsa3_2, current_sarsa3_2 = exper_sarsa3_2.explore_sarsa(policy_s3_2.PRANDOM, gamma = 0.5, alpha = 0.15)
-    explore_sarsa3_2.print_table("3_2_explore.csv")    
+    print("\nRun SARSA PRANDOM for 500 steps, alpha = 0.15")
+
+    policy_s3_215 = Policy()
+    table_sarsa3_215 = QTable()
+
+    exper_sarsa3_215 = Run(state, table_sarsa3_215)
+    explore_sarsa3_215, current_sarsa3_215 = exper_sarsa3_215.explore_sarsa(policy_s3_215.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa3_215.print_table("3_2_explore.csv")    
+
+    print("\nRun SARSA PEXPLOIT for remaining 8500 steps, alpha = 0.15")
 
     table_3_2_15 = deepcopy(explore_sarsa_2)
     train_3_2_15 = Run(state, table_3_2_15)
-    result_3_2_15 = train_3_2_15.train_sarsa(current_sarsa3_2, policy_s3_2.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="3")
+    result_3_2_15 = train_3_2_15.train_sarsa(current_sarsa3_215, policy_s3_215.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="3")
     result_3_2_15.print_table("3_2_result_a15.csv")
 
     # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.45
 
-    table_3_2_45 = deepcopy(explore_sarsa_2)
+    print("\nRun SARSA PRANDOM for 500 steps, alpha = 0.45")
+
+    policy_s3_245 = Policy()
+    table_sarsa3_245 = QTable()
+
+    exper_sarsa3_245 = Run(state, table_sarsa3_245)
+    explore_sarsa3_245, current_sarsa3_245 = exper_sarsa3_245.explore_sarsa(policy_s3_245.PRANDOM, gamma = 0.5, alpha = 0.15)
+    explore_sarsa3_245.print_table("3_2_a45_explore.csv")  
+
+    
+    # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.45
+
+    print("\nRun SARSA PEXPLOIT for remaining 8500 steps, alpha = 0.45")
+
+    table_3_2_45 = deepcopy(explore_sarsa3_245)
     train_3_2_45 = Run(state, table_3_2_45)
-    result_3_2_45 = train_3_2_45.train_sarsa(current_sarsa3_2, policy_s3_2.PEXPLOIT, gamma = 0.5, alpha = 0.45, exper="3")
+    result_3_2_45 = train_3_2_45.train_sarsa(current_sarsa3_245, policy_s3_245.PEXPLOIT, gamma = 0.5, alpha = 0.45, exper="3")
     result_3_2_45.print_table("3_2_result_a45.csv")
 
     ################################################################################
@@ -937,9 +1028,13 @@ def main():
     #                                                                              #
     ################################################################################
     
+    print("\n---------Experiment 4.1---------")
+
     seed = 41
     np.random.seed(seed)
     random.seed(seed)
+
+    print("Run SARSA PRANDOM for 500 steps")
 
     # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.3 and gamma = 0.5
     policy_s4_1 = Policy()
@@ -949,6 +1044,7 @@ def main():
     explore_sarsa4_1, current_sarsa4_1 = exper_sarsa4_1.explore_sarsa(policy_s4_1.PRANDOM, gamma = 0.5, alpha = 0.15)
     explore_sarsa4_1.print_table("4_1_explore.csv")    
 
+    print("Run SARSA PEXPLOIT for remaining 8500 steps, changing pickup locations")
 
     # Change pickup locations after terminal state reached
     table_4_1 = deepcopy(explore_sarsa4_1)
@@ -962,9 +1058,13 @@ def main():
     #                                                                              #
     ################################################################################
     
+    print("\n---------Experiment 4.2---------")
+
     seed = 42
     np.random.seed(seed)
     random.seed(seed)
+
+    print("Run SARSA PRANDOM for 500 steps")
 
     # Rerun experiment 2 SARSA PEXPLOIT with alpha = 0.3 and gamma = 0.5
     policy_s4_2 = Policy()
@@ -976,6 +1076,9 @@ def main():
 
 
     # Change pickup locations after terminal state reached
+
+    print("Run SARSA PEXPLOIT for remaining 8500 steps, changing pickup locations")
+
     table_4_2 = deepcopy(explore_sarsa4_2)
     train_4_2 = Run(state, table_4_2)
     result_4_2 = train_4_2.train_sarsa_change(current_sarsa4_2, policy_s4_2.PEXPLOIT, gamma = 0.5, alpha = 0.15, exper="4")
