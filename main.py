@@ -501,7 +501,7 @@ class Policy:
             
         return action, operator
     
-    def PEXPLOIT(self, current_state: State, env: Environmnt, actor, qTable: QTable) -> list[Direction]:
+    def PEXPLOIT(self, current_state: State, env: Environment, actor, qTable: QTable) -> list[Direction]:
         """Generates the EXPLOIT policy"""
         operator = []
 
@@ -712,7 +712,12 @@ class Run:
             if current_state.is_terminal() == True:
                 print("Terminal state reached in", exper)
                 num_terms += 1
-                current_state = self.change_env(current_state)
+
+                if num_terms == 3:
+                    current_state = self.change_env(current_state)
+                else:
+                    current_state = deepcopy(self.init_state)
+                
                 next_action.clear()
                 for actor in current_state.actors:
                     next_action[actor], _ = policy(current_state, current_state.env, actor, self.table)
