@@ -713,7 +713,7 @@ class Run:
                 print("Terminal state reached in", exper)
                 num_terms += 1
 
-                if num_terms == 3:
+                if num_terms >= 3 and num_terms < 6:
                     current_state = self.change_env(current_state)
                 else:
                     current_state = deepcopy(self.init_state)
@@ -874,7 +874,7 @@ def main():
     table_1c_2 = deepcopy(explore_q_2)
     train_1c_2 = Run(state, table_1c_2)
     result_1c_2 = train_1c_2.train_q(current_q_2, policy_q_1_2.PEXPLOIT, gamma = 0.5, alpha = 0.3, exper="1c")
-    result_1c_2.print_table("1c_1.csv")
+    result_1c_2.print_table("1c_2.csv")
 
 
     ################################################################################
